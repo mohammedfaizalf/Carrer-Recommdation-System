@@ -815,30 +815,33 @@ nltk.download('averaged_perceptron_tagger')
 # Load AI models with GPU support
 @st.cache_resource
 def load_models():
-    # Load spaCy model with GPU support if available
-    spacy.require_gpu()
+    try:
+        spacy.require_gpu()
+    except Exception as e:
+        st.warning(f"GPU not available for spaCy: {e}")
+    
     nlp = spacy.load("en_core_web_sm")
-    
-    # Load BERT model with GPU support
+
     skill_matcher = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-    skill_matcher.to(device)
-    
-    # Load sentiment analyzer with GPU support
+    skill_matcher.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+
     sentiment_model_name = "distilbert-base-uncased-finetuned-sst-2-english"
     sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model_name)
-    sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name).to(device)
-    sentiment_analyzer = pipeline("sentiment-analysis",
-                                model=sentiment_model,
-                                tokenizer=sentiment_tokenizer,
-                                device=0 if torch.cuda.is_available() else -1,
-                                max_length=512,
-                                truncation=True)
-    
-    # Load text classification model with GPU support
-    job_classifier = pipeline("zero-shot-classification",
-                            model="facebook/bart-large-mnli",
-                            device=0 if torch.cuda.is_available() else -1)
-    
+    sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name).to(
+        torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    sentiment_analyzer = pipeline(
+        "sentiment-analysis",
+        model=sentiment_model,
+        tokenizer=sentiment_tokenizer,
+        device=0 if torch.cuda.is_available() else -1
+    )
+
+    job_classifier = pipeline(
+        "zero-shot-classification",
+        model="facebook/bart-large-mnli",
+        device=0 if torch.cuda.is_available() else -1
+    )
+
     return nlp, skill_matcher, sentiment_analyzer, job_classifier
 
 nlp, skill_matcher, sentiment_analyzer, job_classifier = load_models()
